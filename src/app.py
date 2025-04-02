@@ -5,6 +5,8 @@ import pandas as pd
 from datetime import datetime
 from finance_assistant import FinanceAssistant
 from ai_helper import FinanceAI
+import requests
+import os
 
 def main():
     st.title("AI-Powered Personal Finance Assistant")
@@ -15,6 +17,9 @@ def main():
     # Add sample data button in sidebar
     if st.sidebar.button("Load Sample Data"):
         load_sample_data(finance)
+    
+    # Replace the existing deploy button with:
+    deploy_to_github()  # This will show the expanded deploy interface
     
     # Navigation
     page = st.sidebar.selectbox("Navigation", 
@@ -211,6 +216,62 @@ def load_sample_data(finance):
         finance.set_budget(category, amount)
     
     st.sidebar.success("Sample data loaded successfully!")
+
+def deploy_to_github():
+    with st.sidebar.expander("🚀 Deploy to GitHub"):
+        github_username = st.text_input("GitHub Username", key="github_username")
+        repo_name = st.text_input("Repository Name", "AI-Powered-Finance-Assistant", key="repo_name")
+        access_token = st.text_input("GitHub Access Token", type="password", key="github_token")
+        
+        if st.button("Deploy Now"):
+            try:
+                # Validate inputs
+                if not all([github_username, repo_name, access_token]):
+                    st.error("Please fill all fields")
+                    return
+                
+                # Create repository
+                headers = {
+                    "Authorization": f"token {access_token}",
+                    "Accept": "application/vnd.github.v3+json"
+                }
+                data = {
+                    "name": repo_name,
+                    "private": False,
+                    "auto_init": False  # Changed to False since we'll push our own files
+                }
+                
+                # Check if repo exists
+                response = requests.get(
+                    f"https://api.github.com/repos/{github_username}/{repo_name}",
+                    headers=headers
+                )
+                
+                if response.status_code == 404:
+                    # Create new repo if doesn't exist
+                    response = requests.post(
+                        "https://api.github.com/user/repos",
+                        headers=headers,
+                        json=data
+                    )
+                    response.raise_for_status()
+                
+                # Initialize and push code
+                os.system("git init")
+                os.system("git config --global user.name \"Streamlit App\"")
+                os.system("git config --global user.email \"app@example.com\"")
+                os.system("git add .")
+                os.system('git commit -m "Initial commit from Streamlit"')
+                os.system(f"git remote add origin https://{github_username}:{access_token}@github.com/{github_username}/{repo_name}.git")
+                os.system("git push -u origin main --force")
+                
+                st.success(f"✅ Successfully deployed to GitHub!\n\n"
+                          f"View your repo: https://github.com/{github_username}/{repo_name}")
+                
+            except requests.exceptions.RequestException as e:
+                st.error(f"GitHub API error: {str(e)}")
+            except Exception as e:
+                st.error(f"Deployment failed: {str(e)}")
 
 if __name__ == "__main__":
     main()
