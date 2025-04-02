@@ -230,46 +230,36 @@ def deploy_to_github():
                     st.error("Please fill all fields")
                     return
                 
-                # Create repository
-                headers = {
-                    "Authorization": f"token {access_token}",
-                    "Accept": "application/vnd.github.v3+json"
-                }
-                data = {
-                    "name": repo_name,
-                    "private": False,
-                    "auto_init": False  # Changed to False since we'll push our own files
-                }
+                import subprocess
+                from git import Repo
                 
-                # Check if repo exists
-                response = requests.get(
-                    f"https://api.github.com/repos/{github_username}/{repo_name}",
-                    headers=headers
-                )
+                # Initialize git repo if not already
+                if not os.path.exists('.git'):
+                    Repo.init()
                 
-                if response.status_code == 404:
-                    # Create new repo if doesn't exist
-                    response = requests.post(
-                        "https://api.github.com/user/repos",
-                        headers=headers,
-                        json=data
-                    )
-                    response.raise_for_status()
+                # Add all files
+                subprocess.run(["git", "add", "."], check=True)
                 
-                # Initialize and push code
-                os.system("git init")
-                os.system("git config --global user.name \"Streamlit App\"")
-                os.system("git config --global user.email \"app@example.com\"")
-                os.system("git add .")
-                os.system('git commit -m "Initial commit from Streamlit"')
-                os.system(f"git remote add origin https://{github_username}:{access_token}@github.com/{github_username}/{repo_name}.git")
-                os.system("git push -u origin main --force")
+                # Commit changes
+                subprocess.run(["git", "commit", "-m", "Initial commit from Streamlit"], check=True)
                 
-                st.success(f"✅ Successfully deployed to GitHub!\n\n"
-                          f"View your repo: https://github.com/{github_username}/{repo_name}")
+                # Set remote URL with token authentication
+                remote_url = f"https://{github_username}:{access_token}@github.com/{github_username}/{repo_name}.git"
+                subprocess.run(["git", "remote", "add", "origin", remote_url], check=True)
                 
-            except requests.exceptions.RequestException as e:
-                st.error(f"GitHub API error: {str(e)}")
+                # Force push to ensure it works for initial commits
+                result = subprocess.run(["git", "push", "-u", "origin", "main", "--force"], 
+                                      capture_output=True, text=True)
+                
+                if result.returncode == 0:
+                    st.success(f"✅ Successfully deployed to GitHub!\n\n"
+                             f"View your repo: https://github.com/{github_username}/{repo_name}")
+                    st.code(result.stdout)
+                else:
+                    st.error(f"Push failed:\n{result.stderr}")
+                
+            except subprocess.CalledProcessError as e:
+                st.error(f"Git command failed: {e.stderr}")
             except Exception as e:
                 st.error(f"Deployment failed: {str(e)}")
 
